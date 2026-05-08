@@ -1,4 +1,6 @@
-import sys
+from flask import Flask, request, render_template_string
+
+app = Flask(__name__)
 
 # Genetic code (RNA codons → amino acids)
 CODON_TABLE = {
@@ -69,44 +71,157 @@ def translate(mrna):
 
     for i in range(0, len(mrna) - 2, 3):
         codon = mrna[i:i+3]
+
         if codon in CODON_TABLE:
             aa3, aa1 = CODON_TABLE[codon]
+
             if aa3 == "Stop":
                 break
+
             amino_acids_3.append(aa3)
             amino_acids_1.append(aa1)
 
     return amino_acids_3, amino_acids_1
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <nucleotide_sequence>")
-        return
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nucleotide Analyzer</title>
 
-    seq = sys.argv[1].upper()
-    seq_type = detect_type(seq)
+    <style>
+        body{
+            font-family: Arial;
+            background:#f4f4f4;
+            padding:40px;
+        }
 
-    if seq_type == "Invalid":
-        print("Invalid sequence. Use only A, T, C, G or A, U, C, G.")
-        return
+        .container{
+            max-width:700px;
+            margin:auto;
+            background:white;
+            padding:30px;
+            border-radius:10px;
+        }
 
-    print(f"Sequence Type: {seq_type}")
+        textarea{
+            width:100%;
+            padding:10px;
+            font-size:16px;
+        }
 
-    if seq_type == "DNA":
-        mrna = dna_to_mrna(seq)
-        trna = trna_from_mrna(mrna)
-        aa3, aa1 = translate(mrna)
+        button{
+            margin-top:20px;
+            padding:12px 20px;
+            background:#2563eb;
+            color:white;
+            border:none;
+            border-radius:8px;
+            cursor:pointer;
+        }
 
-        print(f"mRNA: {mrna}")
-        print(f"tRNA: {trna}")
-        print(f"Amino Acid (3-letter): {'-'.join(aa3)}")
-        print(f"Protein (1-letter): {''.join(aa1)}")
+        .result{
+            margin-top:25px;
+            padding:20px;
+            background:#eef2ff;
+            border-radius:8px;
+        }
+    </style>
+</head>
 
-    elif seq_type == "RNA":
-        comp = complement_rna(seq)
-        print(f"Complementary RNA: {comp}")
+<body>
+
+<div class="container">
+
+    <h1>🧬 Nucleotide Analyzer</h1>
+
+    <form method="POST">
+
+        <textarea
+            name="sequence"
+            rows="5"
+            placeholder="Enter DNA or RNA sequence"
+            required
+        ></textarea>
+
+        <button type="submit">
+            Analyze Sequence
+        </button>
+
+    </form>
+
+    {% if result %}
+    <div class="result">
+
+        <h2>Sequence Type: {{ result.type }}</h2>
+
+        {% if result.type == "DNA" %}
+
+            <p><strong>mRNA:</strong> {{ result.mrna }}</p>
+
+            <p><strong>tRNA:</strong> {{ result.trna }}</p>
+
+            <p><strong>3-Letter Amino Acids:</strong>
+            {{ result.aa3 }}</p>
+
+            <p><strong>Protein Sequence:</strong>
+            {{ result.aa1 }}</p>
+
+        {% elif result.type == "RNA" %}
+
+            <p><strong>Complementary RNA:</strong>
+            {{ result.complement }}</p>
+
+        {% else %}
+
+            <p>Invalid sequence entered.</p>
+
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>
+"""
+
+
+@app.route("/", methods=["GET", "POST"])
+def home():
+
+    result = None
+
+    if request.method == "POST":
+
+        seq = request.form["sequence"].upper().strip()
+
+        seq_type = detect_type(seq)
+
+        result = {"type": seq_type}
+
+        if seq_type == "DNA":
+
+            mrna = dna_to_mrna(seq)
+            trna = trna_from_mrna(mrna)
+
+            aa3, aa1 = translate(mrna)
+
+            result.update({
+                "mrna": mrna,
+                "trna": trna,
+                "aa3": "-".join(aa3),
+                "aa1": "".join(aa1)
+            })
+
+        elif seq_type == "RNA":
+
+            result["complement"] = complement_rna(seq)
+
+    return render_template_string(HTML, result=result)
 
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
