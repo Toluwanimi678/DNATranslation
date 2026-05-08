@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Global Sequence Alignment</title>
+
+    <style>
+        body{
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin:0;
+            padding:40px;
+        }
+
+        .container{
+            max-width:700px;
+            margin:auto;
+            background:white;
+            padding:30px;
+            border-radius:12px;
+            box-shadow:0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h1{
+            text-align:center;
+            color:#333;
+        }
+
+        label{
+            display:block;
+            margin-top:15px;
+            font-weight:bold;
+        }
+
+        textarea{
+            width:100%;
+            padding:12px;
+            margin-top:8px;
+            border-radius:8px;
+            border:1px solid #ccc;
+            resize:vertical;
+            font-size:16px;
+        }
+
+        .scores{
+            display:grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap:15px;
+            margin-top:20px;
+        }
+
+        input{
+            width:100%;
+            padding:10px;
+            border-radius:8px;
+            border:1px solid #ccc;
+            font-size:16px;
+        }
+
+        button{
+            width:100%;
+            margin-top:25px;
+            padding:14px;
+            border:none;
+            border-radius:10px;
+            background:#2563eb;
+            color:white;
+            font-size:18px;
+            cursor:pointer;
+        }
+
+        button:hover{
+            background:#1d4ed8;
+        }
+
+        .result{
+            margin-top:30px;
+            background:#eef2ff;
+            padding:20px;
+            border-radius:10px;
+        }
+
+        .alignment{
+            font-family: monospace;
+            font-size:18px;
+            margin-top:15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .score{
+            font-size:24px;
+            font-weight:bold;
+            color:#111827;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>🧬 Global Sequence Alignment</h1>
+
+    <label>Sequence 1</label>
+    <textarea id="seq1" rows="3" placeholder="Enter first sequence"></textarea>
+
+    <label>Sequence 2</label>
+    <textarea id="seq2" rows="3" placeholder="Enter second sequence"></textarea>
+
+    <div class="scores">
+        <div>
+            <label>Match</label>
+            <input type="number" id="match" value="1">
+        </div>
+
+        <div>
+            <label>Mismatch</label>
+            <input type="number" id="mismatch" value="-1">
+        </div>
+
+        <div>
+            <label>Gap</label>
+            <input type="number" id="gap" value="-2">
+        </div>
+    </div>
+
+    <button onclick="alignSequences()">Align Sequences</button>
+
+    <div class="result" id="result" style="display:none;">
+        <div class="score" id="score"></div>
+
+        <div class="alignment" id="alignment1"></div>
+        <div class="alignment" id="alignment2"></div>
+    </div>
+
+</div>
+
+<script>
+
+function globalAlignment(seq1, seq2, match, mismatch, gap){
+
+    const n = seq1.length;
+    const m = seq2.length;
+
+    let dp = Array.from({length:n+1}, () => Array(m+1).fill(0));
+
+    // Initialize matrix
+    for(let i=0;i<=n;i++){
+        dp[i][0] = i * gap;
+    }
+
+    for(let j=0;j<=m;j++){
+        dp[0][j] = j * gap;
+    }
+
+    // Fill matrix
+    for(let i=1;i<=n;i++){
+        for(let j=1;j<=m;j++){
+
+            let diag =
+                dp[i-1][j-1] +
+                (seq1[i-1] === seq2[j-1] ? match : mismatch);
+
+            let up = dp[i-1][j] + gap;
+            let left = dp[i][j-1] + gap;
+
+            dp[i][j] = Math.max(diag, up, left);
+        }
+    }
+
+    // Traceback
+    let aligned1 = "";
+    let aligned2 = "";
+
+    let i = n;
+    let j = m;
+
+    while(i > 0 || j > 0){
+
+        if(
+            i > 0 &&
+            j > 0 &&
+            dp[i][j] === dp[i-1][j-1] +
+            (seq1[i-1] === seq2[j-1] ? match : mismatch)
+        ){
+            aligned1 = seq1[i-1] + aligned1;
+            aligned2 = seq2[j-1] + aligned2;
+            i--;
+            j--;
+        }
+
+        else if(
+            i > 0 &&
+            dp[i][j] === dp[i-1][j] + gap
+        ){
+            aligned1 = seq1[i-1] + aligned1;
+            aligned2 = "-" + aligned2;
+            i--;
+        }
+
+        else{
+            aligned1 = "-" + aligned1;
+            aligned2 = seq2[j-1] + aligned2;
+            j--;
+        }
+    }
+
+    return {
+        score: dp[n][m],
+        aligned1,
+        aligned2
+    };
+}
+
+
+function alignSequences(){
+
+    const seq1 = document.getElementById("seq1").value.trim().toUpperCase();
+    const seq2 = document.getElementById("seq2").value.trim().toUpperCase();
+
+    const match = parseInt(document.getElementById("match").value);
+    const mismatch = parseInt(document.getElementById("mismatch").value);
+    const gap = parseInt(document.getElementById("gap").value);
+
+    if(!seq1 || !seq2){
+        alert("Please enter both sequences.");
+        return;
+    }
+
+    const result = globalAlignment(seq1, seq2, match, mismatch, gap);
+
+    document.getElementById("result").style.display = "block";
+
+    document.getElementById("score").innerHTML =
+        `Global Alignment Score: ${result.score}`;
+
+    document.getElementById("alignment1").innerHTML =
+        `Seq 1: ${result.aligned1}`;
+
+    document.getElementById("alignment2").innerHTML =
+        `Seq 2: ${result.aligned2}`;
+}
+
+</script>
+
+</body>
+</html>
